@@ -104,7 +104,7 @@ elif st.session_state.page == "home":
     tampilkan_logo()
     st.title(f"Halo, {st.session_state.username} 👋")
     st.write("Silakan pilih menu:")
-    if st.button("➕ Tulis Status Baru"):
+    if st.button("➕ Input Status"):
         st.session_state.page = "input"
         st.rerun()
     if st.button("📊 Lihat Riwayat & Hasil"):
