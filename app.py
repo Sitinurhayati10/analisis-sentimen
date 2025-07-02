@@ -98,15 +98,18 @@ if st.session_state.page == "login":
         st.rerun()
 
 # -----------------------------
-# 5. Home Page
+# 5. Home Page (Sudah Diubah)
 # -----------------------------
 elif st.session_state.page == "home":
     tampilkan_logo()
-    st.title(f"Halo, {st.session_state.username} 👋")
-    st.write("Silakan pilih menu:")
-    if st.button("➕ Input Status"):
+    st.title(f"Selamat datang, {st.session_state.username} 👋")
+    st.write("✨ Aplikasi ini membantu kamu menganalisis sentimen dari status Facebook yang kamu tulis.")
+    st.write("Silakan pilih menu di bawah:")
+
+    if st.button("📝 Input Status"):
         st.session_state.page = "input"
         st.rerun()
+
     if st.button("📊 Lihat Riwayat & Hasil"):
         st.session_state.page = "hasil"
         st.rerun()
