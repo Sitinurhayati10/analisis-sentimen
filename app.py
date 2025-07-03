@@ -59,6 +59,12 @@ def check_autologout(timeout=900):
     else:
         st.session_state.last_active = now
 
+def logout():
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.success("🔒 Kamu berhasil logout.")
+    st.stop()
+
 def init_db():
     conn = sqlite3.connect('sentimen.db')
     c = conn.cursor()
@@ -156,8 +162,7 @@ with st.sidebar:
     if "username" in st.session_state:
         st.markdown("---")
         if st.button("🚪 Logout"):
-            st.session_state.clear()
-            st.rerun()
+            logout()
 
 # -----------------------------
 # 4. Login Page
