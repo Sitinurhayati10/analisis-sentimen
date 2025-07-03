@@ -206,19 +206,24 @@ if st.session_state.page == "login":
         password = st.text_input("Password", type="password")
         if st.button("Masuk"):
             if not username or not password:
-                st.warning("⚠️ Username dan password tidak boleh kosong.")
+            st.warning("⚠️ Username dan password tidak boleh kosong.")
         else:
-            nama_lengkap = validasi_login(username, password)
-            if nama_lengkap:
+            hasil_login = validasi_login(username, password)
+
+            if hasil_login == "TIDAK_TERDAFTAR":
+                st.warning("⚠️ Akun belum terdaftar. Silakan daftar dulu.")
+            elif hasil_login == "PASSWORD_SALAH":
+                st.error("❌ Username atau password salah.")
+            else:
+                # login berhasil
                 st.session_state.username = username
-                st.session_state.nama = nama_lengkap
+                st.session_state.nama = hasil_login
                 st.session_state.last_active = time.time()
                 st.session_state.last_motivation_date = None
                 st.session_state.page = "home"
                 st.success("✅ Login berhasil.")
                 st.rerun()
-            else:
-                st.error("Username atau password salah.")
+
 
     with tab2:
         nama_lengkap = st.text_input("Nama Lengkap", key="reg_nama")
