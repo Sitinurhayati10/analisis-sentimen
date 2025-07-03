@@ -1,11 +1,9 @@
 import streamlit as st
 import sqlite3
-import requests
 import joblib
 import pandas as pd
 import re
 from datetime import datetime
-import urllib.parse
 
 # ========== 1. Load Model & Encoder ==========
 model = joblib.load("logistic_regression_model.pkl")
@@ -89,75 +87,7 @@ if st.session_state.page == "login":
         st.session_state.page = "home"
         st.rerun()
 
-    if "fb_token" not in st.session_state:
-        st.markdown("---")
-        st.subheader("Atau login via Facebook:")
-        APP_ID = st.secrets["APP_ID"]
-        REDIRECT_URI = st.secrets["REDIRECT_URI"]
-        login_url = f"https://www.facebook.com/v19.0/dialog/oauth?client_id={APP_ID}&redirect_uri={urllib.parse.quote(REDIRECT_URI)}&scope=public_profile"
-        st.markdown(f"[🔗 Klik untuk login dengan Facebook]({login_url})")
-
-    code = st.query_params.get("code", None)
-    if isinstance(code, list):
-        code = code[0]
-    
-    if code:
-        APP_ID = st.secrets["APP_ID"]
-        APP_SECRET = st.secrets["APP_SECRET"]
-        REDIRECT_URI = st.secrets["REDIRECT_URI"]
-
-        token_resp = requests.get("https://graph.facebook.com/v19.0/oauth/access_token", params={
-            "client_id": APP_ID,
-            "redirect_uri": REDIRECT_URI,
-            "client_secret": APP_SECRET,
-            "code": code
-        }).json()
-
-        st.write("DEBUG TOKEN:", token_resp)  # Tambahkan ini
-
-        access_token = token_resp.get("access_token")
-        if access_token:
-            profile = requests.get(f"https://graph.facebook.com/me?fields=id,name&access_token={access_token}").json()
-            user_id = profile.get("id")
-            user_name = profile.get("name")
-
-            st.session_state.username = user_id
-            st.session_state.fb_token = access_token
-            st.success(f"✅ Login berhasil sebagai {user_name}")
-            st.session_state.page = "fb_status"
-            st.rerun()
-        else:
-            st.error("❌ Gagal login ke Facebook. Periksa konfigurasi App ID dan Secret.")
-
-# ========== 5. Facebook Status Page ==========
-elif st.session_state.page == "fb_status":
-    tampilkan_logo()
-    st.title("📥 Status Facebook Anda")
-
-    token = st.session_state.fb_token
-    user_id = st.session_state.username
-
-    try:
-        posts = requests.get(f"https://graph.facebook.com/me/feed?fields=message,created_time&access_token={token}").json()
-        for post in posts.get("data", []):
-            teks = post.get("message", "")
-            if teks:
-                st.write(f"💬 {teks}")
-                label, conf = prediksi_sentimen(teks)
-                st.write(f"📌 Sentimen: **{label}**, Kepercayaan: {conf}%")
-                simpan_status(user_id, teks, label, conf)
-
-        st.success("✅ Semua status publik berhasil dianalisis dan disimpan.")
-
-    except Exception as e:
-        st.error("⚠️ Gagal mengambil status dari Facebook.")
-        st.error(str(e))
-
-    if st.button("🔁 Lihat Riwayat"):
-        st.session_state.page = "hasil"
-        st.rerun()
-
-# ========== 6. Home Page ==========
+# ========== 5. Home Page ==========
 elif st.session_state.page == "home":
     tampilkan_logo()
     st.title(f"Halo, {st.session_state.username} 👋")
@@ -169,7 +99,7 @@ elif st.session_state.page == "home":
         st.session_state.page = "hasil"
         st.rerun()
 
-# ========== 7. Input Status Page ==========
+# ========== 6. Input Status Page ==========
 elif st.session_state.page == "input":
     tampilkan_logo()
     st.title("📝 Tulis Status")
@@ -194,7 +124,7 @@ elif st.session_state.page == "input":
         else:
             st.warning("Status tidak boleh kosong.")
 
-# ========== 8. Hasil dan Riwayat ==========
+# ========== 7. Hasil dan Riwayat ==========
 elif st.session_state.page == "hasil":
     tampilkan_logo()
     st.title("📊 Hasil Analisis")
