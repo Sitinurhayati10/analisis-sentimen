@@ -14,7 +14,7 @@ label_encoder = joblib.load("label_encoder.pkl")
 def tampilkan_logo():
     col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
-        st.image("logo_sentimen.png", width=60)
+        st.image("sentimen.png", width=60)
 
 def init_db():
     conn = sqlite3.connect('sentimen.db')
