@@ -1,21 +1,63 @@
 import streamlit as st
 import sqlite3
-import joblib
-import pandas as pd
-import re
 from datetime import datetime
-import altair as alt
+import pandas as pd
+import joblib
+import random
+import re
+import io
+import plotly.express as px
+import time
 
-# ========== 1. Load Model & Encoder ==========
+st.set_page_config("Mental Health Sentiment App", page_icon="💬", layout="centered")
+
+# -----------------------------
+# 1. Load model, TF-IDF, encoder
+# -----------------------------
 model = joblib.load("logistic_regression_model.pkl")
 tfidf = joblib.load("tfidf_vectorizer (1).pkl")
 label_encoder = joblib.load("label_encoder.pkl")
 
-# ========== 2. Utility Functions ==========
+# -----------------------------
+# 2. Fungsi bantu
+# -----------------------------
 def tampilkan_logo():
     col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
         st.image("sentimen.png", width=60)
+
+def tampilkan_motivasi():
+    motivasi_list = [
+        "🌟 Kamu lebih kuat dari yang kamu pikirkan.",
+        "💪 Setiap hari adalah kesempatan baru untuk memulai.",
+        "✨ Jangan biarkan hari buruk merusak hidup yang indah.",
+        "🧘 Ambil napas dalam, kamu akan baik-baik saja.",
+        "🌈 Setelah hujan, selalu ada pelangi."
+    ]
+    motivasi = random.choice(motivasi_list)
+    st.markdown(f"""
+    <div class="sentiment-box">
+        <strong>Motivasi Hari Ini:</strong><br>
+        {motivasi}
+    </div>
+    """, unsafe_allow_html=True)
+
+def tampilkan_motivasi_harian():
+    today = datetime.today().date()
+    if st.session_state.get("last_motivation_date") != today:
+        st.session_state.last_motivation_date = today
+        tampilkan_motivasi()
+
+def check_autologout(timeout=900):
+    now = time.time()
+    last_active = st.session_state.get("last_active", now)
+    if now - last_active > timeout:
+        st.session_state.page = "login"
+        st.session_state.username = None
+        st.warning("⏳ Kamu telah logout otomatis karena tidak aktif.")
+        st.stop()
+    else:
+        st.session_state.last_active = now
 
 def init_db():
     conn = sqlite3.connect('sentimen.db')
@@ -27,6 +69,14 @@ def init_db():
             label_sentimen TEXT,
             kepercayaan REAL,
             tanggal_status DATE,
+            id_user TEXT
+        )
+    ''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS journal (
+            id_journal INTEGER PRIMARY KEY AUTOINCREMENT,
+            isi TEXT,
+            tanggal DATE,
             id_user TEXT
         )
     ''')
@@ -54,6 +104,20 @@ def hapus_semua_riwayat(id_user):
     conn.commit()
     conn.close()
 
+def simpan_journal(id_user, isi):
+    conn = sqlite3.connect('sentimen.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO journal (isi, tanggal, id_user) VALUES (?, ?, ?)",
+              (isi, datetime.today().date(), id_user))
+    conn.commit()
+    conn.close()
+
+def ambil_journal(id_user):
+    conn = sqlite3.connect('sentimen.db')
+    df = pd.read_sql_query("SELECT * FROM journal WHERE id_user = ? ORDER BY tanggal DESC", conn, params=(id_user,))
+    conn.close()
+    return df
+
 def bersihkan_teks(teks):
     teks = teks.lower()
     teks = re.sub(r'[^a-zA-Z\s]', '', teks)
@@ -72,63 +136,71 @@ def prediksi_sentimen(teks):
     label = label_encoder.inverse_transform(pred)[0]
     return label.upper(), round(prob, 2)
 
-def rekomendasi_sentimen(label):
-    if label == "POSITIF":
-        return """
-<span style='color:green; font-size:16px;'>☺ <strong>Tetap pertahankan energi positifmu!</strong></span><br>
-Lanjutkan membagikan semangat kepada orang lain dan simpan momen positif untuk refleksi di masa mendatang.
-"""
-    elif label == "NETRAL":
-        return """
-<span style='color:orange; font-size:16px;'>🔎 <strong>Status kamu cukup netral hari ini.</strong></span><br>
-Coba tanyakan pada diri sendiri apa yang sebenarnya kamu rasakan, dan eksplorasi emosi lebih dalam lewat journaling atau refleksi.
-"""
-    elif label == "NEGATIF":
-        return """
-<span style='color:red; font-size:16px;'>😟 <strong>Kamu terlihat sedang kurang baik-baik saja.</strong></span><br>
-Luangkan waktu untuk istirahat atau melakukan hal-hal yang menenangkan. Jangan ragu untuk bercerita ke orang terpercaya.
-"""
-    else:
-        return ""
-
-# ========== 3. Init ==========
+# -----------------------------
+# 3. Inisialisasi
+# -----------------------------
 init_db()
 if "page" not in st.session_state:
     st.session_state.page = "login"
 
-# ========== 4. Login Page ==========
+# -----------------------------
+# Sidebar Navigasi
+# -----------------------------
+with st.sidebar:
+    tampilkan_logo()
+    st.title("🧭 Navigasi")
+    st.button("🏠 Beranda", on_click=lambda: st.session_state.update(page="home"))
+    st.button("✍️ Input Status", on_click=lambda: st.session_state.update(page="input"))
+    st.button("📊 Riwayat", on_click=lambda: st.session_state.update(page="hasil"))
+    st.button("📖 Journal", on_click=lambda: st.session_state.update(page="journal"))
+    if "username" in st.session_state:
+        st.markdown("---")
+        if st.button("🚪 Logout"):
+            st.session_state.clear()
+            st.rerun()
+
+# -----------------------------
+# 4. Login Page
+# -----------------------------
 if st.session_state.page == "login":
+    if st.session_state.get("just_redirected"):
+        st.warning("🔒 Kamu harus login terlebih dahulu.")
+        del st.session_state["just_redirected"]
+
     tampilkan_logo()
     st.title("🔐 Masukkan Nama")
-
     username = st.text_input("Masukkan Nama Pengguna:")
     if username:
         st.session_state.username = username
+        st.session_state.last_active = time.time()
+        st.session_state.last_motivation_date = None
         st.session_state.page = "home"
         st.rerun()
 
-# ========== 5. Home Page ==========
+# -----------------------------
+# 5. Home Page
+# -----------------------------
 elif st.session_state.page == "home":
+    if "username" not in st.session_state:
+        st.session_state.update(page="login", just_redirected=True)
+        st.rerun()
+    check_autologout()
     tampilkan_logo()
+    tampilkan_motivasi_harian()
     st.title(f"Halo, {st.session_state.username} 👋")
-    st.write("Silakan pilih menu:")
-    if st.button("➕ Input Status"):
-        st.session_state.page = "input"
-        st.rerun()
-    if st.button("📊 Lihat Riwayat & Hasil"):
-        st.session_state.page = "hasil"
-        st.rerun()
+    st.write("Silakan pilih menu di sidebar.")
 
-# ========== 6. Input Status Page ==========
+# -----------------------------
+# 6. Input Status Page
+# -----------------------------
 elif st.session_state.page == "input":
+    if "username" not in st.session_state:
+        st.session_state.update(page="login", just_redirected=True)
+        st.rerun()
+    check_autologout()
     tampilkan_logo()
     st.title("📝 Tulis Status")
-    if st.button("← Kembali ke Beranda"):
-        st.session_state.page = "home"
-        st.rerun()
-
     status = st.text_area("Apa yang sedang Anda pikirkan hari ini?", height=150)
-
     if st.button("🔍 Analisis Sekarang"):
         if status.strip():
             label, conf = prediksi_sentimen(status)
@@ -144,36 +216,38 @@ elif st.session_state.page == "input":
         else:
             st.warning("Status tidak boleh kosong.")
 
-# ========== 7. Hasil dan Riwayat ==========
+# -----------------------------
+# 7. Hasil dan Riwayat Page
+# -----------------------------
 elif st.session_state.page == "hasil":
+    if "username" not in st.session_state:
+        st.session_state.update(page="login", just_redirected=True)
+        st.rerun()
+    check_autologout()
     tampilkan_logo()
     st.title("📊 Hasil Analisis")
-
-    if st.button("← Kembali ke Input"):
-        st.session_state.page = "input"
-        st.rerun()
-
     if "hasil_status" in st.session_state:
         st.subheader("Status Terakhir:")
         st.write(f'💬 **"{st.session_state.hasil_status}"**')
         st.write(f'📌 Sentimen: **{st.session_state.hasil_label}**')
         st.write(f'📈 Kepercayaan: **{st.session_state.hasil_conf}%**')
-
-        rekom = rekomendasi_sentimen(st.session_state.hasil_label)
-        if rekom:
-            st.markdown("---")
-            st.markdown("💡 <h4>Rekomendasi untuk Anda:</h4>", unsafe_allow_html=True)
-            st.markdown(rekom, unsafe_allow_html=True)
-
-    st.subheader("🕒 Riwayat Status Anda")
-    if st.button("🗑 Hapus Semua Riwayat"):
-        hapus_semua_riwayat(st.session_state.username)
-        st.success("✅ Riwayat berhasil dihapus.")
-        st.rerun()
+        rekomendasi = {
+            "POSITIF": "😊 Pertahankan perasaan positifmu! Coba bagikan kebahagiaan dengan orang terdekat.",
+            "NETRAL": "😐 Coba dengarkan musik yang menenangkan atau lakukan refleksi ringan.",
+            "NEGATIF": "😔 Istirahat sejenak, menulis di jurnal, atau hubungi teman bisa membantu."
+        }
+        st.info(rekomendasi.get(st.session_state.hasil_label, "❤️ Jaga kesehatan mentalmu ya!"))
 
     df = ambil_riwayat(st.session_state.username)
     if not df.empty:
+        st.subheader("📈 Tren Harian")
         df['tanggal_status'] = pd.to_datetime(df['tanggal_status'])
+        df_harian = df.groupby(['tanggal_status', 'label_sentimen']).size().reset_index(name='jumlah')
+        fig = px.bar(df_harian, x='tanggal_status', y='jumlah', color='label_sentimen', barmode='group')
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.subheader("🧾 Riwayat")
+        df['tanggal_status'] = df['tanggal_status'].dt.strftime('%d-%m-%Y')
         df_tampil = df.rename(columns={
             'tanggal_status': 'Tanggal',
             'isi_status': 'Status',
@@ -182,41 +256,42 @@ elif st.session_state.page == "hasil":
         })[['Tanggal', 'Status', 'Label Sentimen', 'Kepercayaan (%)']]
         st.dataframe(df_tampil, use_container_width=True, hide_index=True)
 
-        # ========== Tren Sentimen Mingguan ==========
-        st.markdown("---")
-        st.subheader("📈 Tren Sentimen Mingguan")
-
-        tanggal_mulai = datetime.today().date() - pd.Timedelta(days=6)
-        df_mingguan = df[df['tanggal_status'].dt.date >= tanggal_mulai]
-
-        if not df_mingguan.empty:
-            chart_data = (
-                df_mingguan
-                .groupby([df_mingguan['tanggal_status'].dt.strftime('%a'), 'label_sentimen'])
-                .size()
-                .reset_index(name='jumlah')
-            )
-
-            hari_urut = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-            chart_data['tanggal_status'] = pd.Categorical(chart_data['tanggal_status'], categories=hari_urut, ordered=True)
-
-            line_chart = alt.Chart(chart_data).mark_line(point=True).encode(
-                x=alt.X('tanggal_status:N', title='Hari'),
-                y=alt.Y('jumlah:Q', title='Jumlah Status'),
-                color=alt.Color('label_sentimen:N', scale=alt.Scale(
-                    domain=["POSITIF", "NETRAL", "NEGATIF"],
-                    range=["#4CAF50", "#FFC107", "#F44336"]
-                ), title="Sentimen"),
-                tooltip=['tanggal_status:N', 'label_sentimen:N', 'jumlah:Q']
-            ).properties(
-                width=700,
-                height=400,
-                title="Tren Emosi Mingguan"
-            )
-
-            st.altair_chart(line_chart, use_container_width=True)
-        else:
-            st.info("Belum ada status yang ditulis dalam 7 hari terakhir.")
-
+        buffer = io.BytesIO()
+        df_tampil.to_excel(buffer, index=False)
+        st.download_button("📥 Unduh Riwayat ke Excel", data=buffer.getvalue(), file_name="riwayat_sentimen.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     else:
         st.info("Belum ada riwayat tersedia.")
+
+    if st.button("🗑 Hapus Semua Riwayat"):
+        hapus_semua_riwayat(st.session_state.username)
+        st.success("✅ Riwayat berhasil dihapus.")
+        st.rerun()
+
+# -----------------------------
+# 8. Journaling Page
+# -----------------------------
+elif st.session_state.page == "journal":
+    if "username" not in st.session_state:
+        st.session_state.update(page="login", just_redirected=True)
+        st.rerun()
+    check_autologout()
+    tampilkan_logo()
+    tampilkan_motivasi_harian()
+    st.title("📖 Journaling Harian")
+    st.markdown("Tuliskan apa pun yang ingin kamu tuangkan hari ini:")
+    entry = st.text_area("Catatan hari ini:", height=200)
+    if st.button("💾 Simpan Catatan"):
+        if entry.strip():
+            simpan_journal(st.session_state.username, entry)
+            st.success("📝 Catatan berhasil disimpan!")
+        else:
+            st.warning("⚠️ Catatan tidak boleh kosong.")
+
+    st.markdown("---")
+    st.subheader("📚 Riwayat Catatan")
+    df = ambil_journal(st.session_state.username)
+    if not df.empty:
+        df['tanggal'] = pd.to_datetime(df['tanggal']).dt.strftime('%d-%m-%Y')
+        st.dataframe(df[['tanggal', 'isi']].rename(columns={'tanggal': 'Tanggal', 'isi': 'Catatan'}), use_container_width=True, hide_index=True)
+    else:
+        st.info("Belum ada catatan.")
