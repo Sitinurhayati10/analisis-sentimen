@@ -220,7 +220,6 @@ if st.session_state.page == "login":
             else:
                 st.error("Username atau password salah.")
 
-
     with tab2:
         nama_lengkap = st.text_input("Nama Lengkap", key="reg_nama")
         reg_username = st.text_input("Username", key="reg_user")
