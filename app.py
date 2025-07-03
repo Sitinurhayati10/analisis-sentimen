@@ -8,6 +8,7 @@ import re
 import io
 import plotly.express as px
 import time
+import hashlib
 
 st.set_page_config("Mental Health Sentiment App", page_icon="💬", layout="centered")
 
@@ -53,7 +54,6 @@ def check_autologout(timeout=900):
     last_active = st.session_state.get("last_active", now)
     if now - last_active > timeout:
         st.session_state.page = "login"
-        st.session_state.username = None
         st.warning("⏳ Kamu telah logout otomatis karena tidak aktif.")
         st.stop()
     else:
@@ -65,9 +65,19 @@ def logout():
     st.success("🔒 Kamu berhasil logout.")
     st.stop()
 
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
 def init_db():
     conn = sqlite3.connect('sentimen.db')
     c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            nama_lengkap TEXT,
+            password TEXT
+        )
+    ''')
     c.execute('''
         CREATE TABLE IF NOT EXISTS status (
             id_status INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,6 +98,24 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
+
+def simpan_user(username, nama_lengkap, password):
+    conn = sqlite3.connect('sentimen.db')
+    c = conn.cursor()
+    c.execute("INSERT OR IGNORE INTO users (username, nama_lengkap, password) VALUES (?, ?, ?)",
+              (username, nama_lengkap, hash_password(password)))
+    conn.commit()
+    conn.close()
+
+def validasi_login(username, password):
+    conn = sqlite3.connect('sentimen.db')
+    c = conn.cursor()
+    c.execute("SELECT nama_lengkap, password FROM users WHERE username = ?", (username,))
+    row = c.fetchone()
+    conn.close()
+    if row and row[1] == hash_password(password):
+        return row[0]  # nama_lengkap
+    return None
 
 def simpan_status(id_user, isi_status, label_sentimen, confidence):
     conn = sqlite3.connect('sentimen.db')
@@ -165,34 +193,52 @@ with st.sidebar:
             logout()
 
 # -----------------------------
-# 4. Login Page
+# 4. Login / Register Page
 # -----------------------------
 if st.session_state.page == "login":
-    if st.session_state.get("just_redirected"):
-        st.warning("🔒 Kamu harus login terlebih dahulu.")
-        del st.session_state["just_redirected"]
-
     tampilkan_logo()
-    st.title("🔐 Masukkan Nama")
-    username = st.text_input("Masukkan Nama Pengguna:")
-    if username:
-        st.session_state.username = username
-        st.session_state.last_active = time.time()
-        st.session_state.last_motivation_date = None
-        st.session_state.page = "home"
-        st.rerun()
+    st.title("🔐 Login Pengguna")
+
+    tab1, tab2 = st.tabs(["🔓 Login", "📝 Daftar"])
+
+    with tab1:
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Masuk"):
+            nama_lengkap = validasi_login(username, password)
+            if nama_lengkap:
+                st.session_state.username = username
+                st.session_state.nama = nama_lengkap
+                st.session_state.last_active = time.time()
+                st.session_state.last_motivation_date = None
+                st.session_state.page = "home"
+                st.success("✅ Login berhasil.")
+                st.rerun()
+            else:
+                st.error("Username atau password salah.")
+
+    with tab2:
+        nama_lengkap = st.text_input("Nama Lengkap", key="reg_nama")
+        reg_username = st.text_input("Username", key="reg_user")
+        reg_password = st.text_input("Password", type="password", key="reg_pass")
+        if st.button("Daftar"):
+            if nama_lengkap and reg_username and reg_password:
+                simpan_user(reg_username, nama_lengkap, reg_password)
+                st.success("✅ Akun berhasil dibuat. Silakan login.")
+            else:
+                st.warning("Semua kolom wajib diisi.")
 
 # -----------------------------
 # 5. Home Page
 # -----------------------------
 elif st.session_state.page == "home":
     if "username" not in st.session_state:
-        st.session_state.update(page="login", just_redirected=True)
+        st.session_state.update(page="login")
         st.rerun()
     check_autologout()
     tampilkan_logo()
     tampilkan_motivasi_harian()
-    st.title(f"Halo, {st.session_state.username} 👋")
+    st.title(f"Halo, {st.session_state.nama} 👋")
     st.write("Silakan pilih menu di sidebar.")
 
 # -----------------------------
@@ -200,7 +246,7 @@ elif st.session_state.page == "home":
 # -----------------------------
 elif st.session_state.page == "input":
     if "username" not in st.session_state:
-        st.session_state.update(page="login", just_redirected=True)
+        st.session_state.update(page="login")
         st.rerun()
     check_autologout()
     tampilkan_logo()
@@ -226,7 +272,7 @@ elif st.session_state.page == "input":
 # -----------------------------
 elif st.session_state.page == "hasil":
     if "username" not in st.session_state:
-        st.session_state.update(page="login", just_redirected=True)
+        st.session_state.update(page="login")
         st.rerun()
     check_autologout()
     tampilkan_logo()
@@ -237,9 +283,9 @@ elif st.session_state.page == "hasil":
         st.write(f'📌 Sentimen: **{st.session_state.hasil_label}**')
         st.write(f'📈 Kepercayaan: **{st.session_state.hasil_conf}%**')
         rekomendasi = {
-            "POSITIF": "😊 Pertahankan perasaan positifmu! Coba bagikan kebahagiaan dengan orang terdekat.",
-            "NETRAL": "😐 Coba dengarkan musik yang menenangkan atau lakukan refleksi ringan.",
-            "NEGATIF": "😔 Istirahat sejenak, menulis di jurnal, atau hubungi teman bisa membantu."
+            "POSITIF": "😊 Pertahankan perasaan positifmu!",
+            "NETRAL": "😐 Coba refleksi ringan dan jaga mood.",
+            "NEGATIF": "😔 Menulis jurnal atau bicara ke teman bisa membantu."
         }
         st.info(rekomendasi.get(st.session_state.hasil_label, "❤️ Jaga kesehatan mentalmu ya!"))
 
@@ -262,7 +308,7 @@ elif st.session_state.page == "hasil":
         st.dataframe(df_tampil, use_container_width=True, hide_index=True)
 
         buffer = io.BytesIO()
-        df_tampil.to_excel(buffer, index=False)
+        df_tampil.to_excel(buffer, index=False, engine='openpyxl')
         st.download_button("📥 Unduh Riwayat ke Excel", data=buffer.getvalue(), file_name="riwayat_sentimen.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     else:
         st.info("Belum ada riwayat tersedia.")
@@ -277,13 +323,12 @@ elif st.session_state.page == "hasil":
 # -----------------------------
 elif st.session_state.page == "journal":
     if "username" not in st.session_state:
-        st.session_state.update(page="login", just_redirected=True)
+        st.session_state.update(page="login")
         st.rerun()
     check_autologout()
     tampilkan_logo()
     tampilkan_motivasi_harian()
     st.title("📖 Journaling Harian")
-    st.markdown("Tuliskan apa pun yang ingin kamu tuangkan hari ini:")
     entry = st.text_area("Catatan hari ini:", height=200)
     if st.button("💾 Simpan Catatan"):
         if entry.strip():
