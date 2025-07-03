@@ -202,9 +202,12 @@ if st.session_state.page == "login":
     tab1, tab2 = st.tabs(["🔓 Login", "📝 Daftar"])
 
     with tab1:
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        if st.button("Masuk"):
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Masuk"):
+        if not username or not password:
+            st.warning("⚠️ Username dan password tidak boleh kosong.")
+        else:
             nama_lengkap = validasi_login(username, password)
             if nama_lengkap:
                 st.session_state.username = username
