@@ -201,7 +201,7 @@ if st.session_state.page == "login":
 
     tab1, tab2 = st.tabs(["🔓 Login", "📝 Daftar"])
 
-    with tab1:
+  with tab1:
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     if st.button("Masuk"):
@@ -219,6 +219,7 @@ if st.session_state.page == "login":
                 st.rerun()
             else:
                 st.error("Username atau password salah.")
+
 
     with tab2:
         nama_lengkap = st.text_input("Nama Lengkap", key="reg_nama")
