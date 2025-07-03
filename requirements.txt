@@ -1,6 +1,6 @@
 streamlit
-joblib
+pandas
 scikit-learn
-xgboost
-Sastrawi
+joblib
 plotly
+openpyxl
