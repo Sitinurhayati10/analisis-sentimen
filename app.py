@@ -1,22 +1,21 @@
+import os
+st.write("📂 File di folder:", os.listdir())
+
 import streamlit as st
 import sqlite3
-from datetime import datetime
-import pandas as pd
+import requests
 import joblib
-import random
+import pandas as pd
 import re
+from datetime import datetime
+import urllib.parse
 
-# -----------------------------
-# 1. Load model, TF-IDF, encoder
-# -----------------------------
-model = joblib.load("logistic_regression_model.pkl")  # atau naive_bayes_model.pkl
-tfidf = joblib.load("tfidf_vectorizer.pkl")
+# ========== 1. Load Model & Encoder ==========
+model = joblib.load("logistic_regression_model.pkl")
+tfidf = joblib.load("tfidf_vectorizer (1).pkl")
 label_encoder = joblib.load("label_encoder.pkl")
 
-# -----------------------------
-# 2. Fungsi bantu
-# -----------------------------
-
+# ========== 2. Utility Functions ==========
 def tampilkan_logo():
     col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
@@ -70,53 +69,110 @@ def validasi_input(teks, minimal_kata=3):
 def prediksi_sentimen(teks):
     if not validasi_input(teks):
         return "Terlalu pendek", 0
-
     teks_bersih = bersihkan_teks(teks)
     fitur = tfidf.transform([teks_bersih])
     pred = model.predict(fitur)
-    prob = model.predict_proba(fitur).max() * 100  # Confidence
+    prob = model.predict_proba(fitur).max() * 100
     label = label_encoder.inverse_transform(pred)[0]
     return label.upper(), round(prob, 2)
 
-# -----------------------------
-# 3. Inisialisasi
-# -----------------------------
+# ========== 3. Init ==========
 init_db()
 if "page" not in st.session_state:
     st.session_state.page = "login"
 
-# -----------------------------
-# 4. Login Page
-# -----------------------------
+# ========== 4. Login Page ==========
 if st.session_state.page == "login":
     tampilkan_logo()
-    st.title("🔐 Login Pengguna")
+    st.title("🔐 Masukkan Nama")
+
     username = st.text_input("Masukkan Nama Pengguna:")
     if username:
         st.session_state.username = username
         st.session_state.page = "home"
         st.rerun()
 
-# -----------------------------
-# 5. Home Page (Sudah Diubah)
-# -----------------------------
-elif st.session_state.page == "home":
-    tampilkan_logo()
-    st.title(f"Selamat datang, {st.session_state.username} 👋")
-    st.write("✨ Aplikasi ini membantu kamu menganalisis sentimen dari status Facebook yang kamu tulis.")
-    st.write("Silakan pilih menu di bawah:")
+    if "fb_token" not in st.session_state:
+        st.markdown("---")
+        st.subheader("Atau login via Facebook:")
+        APP_ID = st.secrets["APP_ID"]
+        REDIRECT_URI = st.secrets["REDIRECT_URI"]
+        login_url = f"https://www.facebook.com/v19.0/dialog/oauth?client_id={APP_ID}&redirect_uri={urllib.parse.quote(REDIRECT_URI)}&scope=public_profile"
+        st.markdown(f"[🔗 Klik untuk login dengan Facebook]({login_url})")
 
-    if st.button("📝 Input Status"):
-        st.session_state.page = "input"
+    code = st.query_params.get("code", None)
+    if isinstance(code, list):
+        code = code[0]
+    
+    if code:
+        APP_ID = st.secrets["APP_ID"]
+        APP_SECRET = st.secrets["APP_SECRET"]
+        REDIRECT_URI = st.secrets["REDIRECT_URI"]
+
+        token_resp = requests.get("https://graph.facebook.com/v19.0/oauth/access_token", params={
+            "client_id": APP_ID,
+            "redirect_uri": REDIRECT_URI,
+            "client_secret": APP_SECRET,
+            "code": code
+        }).json()
+
+        st.write("DEBUG TOKEN:", token_resp)  # Tambahkan ini
+
+        access_token = token_resp.get("access_token")
+        if access_token:
+            profile = requests.get(f"https://graph.facebook.com/me?fields=id,name&access_token={access_token}").json()
+            user_id = profile.get("id")
+            user_name = profile.get("name")
+
+            st.session_state.username = user_id
+            st.session_state.fb_token = access_token
+            st.success(f"✅ Login berhasil sebagai {user_name}")
+            st.session_state.page = "fb_status"
+            st.rerun()
+        else:
+            st.error("❌ Gagal login ke Facebook. Periksa konfigurasi App ID dan Secret.")
+
+# ========== 5. Facebook Status Page ==========
+elif st.session_state.page == "fb_status":
+    tampilkan_logo()
+    st.title("📥 Status Facebook Anda")
+
+    token = st.session_state.fb_token
+    user_id = st.session_state.username
+
+    try:
+        posts = requests.get(f"https://graph.facebook.com/me/feed?fields=message,created_time&access_token={token}").json()
+        for post in posts.get("data", []):
+            teks = post.get("message", "")
+            if teks:
+                st.write(f"💬 {teks}")
+                label, conf = prediksi_sentimen(teks)
+                st.write(f"📌 Sentimen: **{label}**, Kepercayaan: {conf}%")
+                simpan_status(user_id, teks, label, conf)
+
+        st.success("✅ Semua status publik berhasil dianalisis dan disimpan.")
+
+    except Exception as e:
+        st.error("⚠️ Gagal mengambil status dari Facebook.")
+        st.error(str(e))
+
+    if st.button("🔁 Lihat Riwayat"):
+        st.session_state.page = "hasil"
         st.rerun()
 
+# ========== 6. Home Page ==========
+elif st.session_state.page == "home":
+    tampilkan_logo()
+    st.title(f"Halo, {st.session_state.username} 👋")
+    st.write("Silakan pilih menu:")
+    if st.button("➕ Input Status"):
+        st.session_state.page = "input"
+        st.rerun()
     if st.button("📊 Lihat Riwayat & Hasil"):
         st.session_state.page = "hasil"
         st.rerun()
 
-# -----------------------------
-# 6. Input Status Page
-# -----------------------------
+# ========== 7. Input Status Page ==========
 elif st.session_state.page == "input":
     tampilkan_logo()
     st.title("📝 Tulis Status")
@@ -141,9 +197,7 @@ elif st.session_state.page == "input":
         else:
             st.warning("Status tidak boleh kosong.")
 
-# -----------------------------
-# 7. Hasil dan Riwayat Page
-# -----------------------------
+# ========== 8. Hasil dan Riwayat ==========
 elif st.session_state.page == "hasil":
     tampilkan_logo()
     st.title("📊 Hasil Analisis")
