@@ -15,7 +15,7 @@ label_encoder = joblib.load("label_encoder.pkl")
 def tampilkan_logo():
     col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
-        st.image("sentimen.png", width=60)
+        st.image("logo_sentimen.png", width=60)
 
 def init_db():
     conn = sqlite3.connect('sentimen.db')
@@ -201,4 +201,22 @@ elif st.session_state.page == "hasil":
             chart_data['tanggal_status'] = pd.Categorical(chart_data['tanggal_status'], categories=hari_urut, ordered=True)
 
             line_chart = alt.Chart(chart_data).mark_line(point=True).encode(
-                x=alt.X('tanggal_status:N', title='Hari')
+                x=alt.X('tanggal_status:N', title='Hari'),
+                y=alt.Y('jumlah:Q', title='Jumlah Status'),
+                color=alt.Color('label_sentimen:N', scale=alt.Scale(
+                    domain=["POSITIF", "NETRAL", "NEGATIF"],
+                    range=["#4CAF50", "#FFC107", "#F44336"]
+                ), title="Sentimen"),
+                tooltip=['tanggal_status:N', 'label_sentimen:N', 'jumlah:Q']
+            ).properties(
+                width=700,
+                height=400,
+                title="Tren Emosi Mingguan"
+            )
+
+            st.altair_chart(line_chart, use_container_width=True)
+        else:
+            st.info("Belum ada status yang ditulis dalam 7 hari terakhir.")
+
+    else:
+        st.info("Belum ada riwayat tersedia.")
