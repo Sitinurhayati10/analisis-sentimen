@@ -4,6 +4,7 @@ import joblib
 import pandas as pd
 import re
 from datetime import datetime
+import altair as alt
 
 # ========== 1. Load Model & Encoder ==========
 model = joblib.load("logistic_regression_model.pkl")
@@ -14,7 +15,7 @@ label_encoder = joblib.load("label_encoder.pkl")
 def tampilkan_logo():
     col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
-        st.image("sentimen.png", width=60)
+        st.image("logo_sentimen.png", width=60)
 
 def init_db():
     conn = sqlite3.connect('sentimen.db')
@@ -70,6 +71,25 @@ def prediksi_sentimen(teks):
     prob = model.predict_proba(fitur).max() * 100
     label = label_encoder.inverse_transform(pred)[0]
     return label.upper(), round(prob, 2)
+
+def rekomendasi_sentimen(label):
+    if label == "POSITIF":
+        return """
+<span style='color:green; font-size:16px;'>☺ <strong>Tetap pertahankan energi positifmu!</strong></span><br>
+Lanjutkan membagikan semangat kepada orang lain dan simpan momen positif untuk refleksi di masa mendatang.
+"""
+    elif label == "NETRAL":
+        return """
+<span style='color:orange; font-size:16px;'>🔎 <strong>Status kamu cukup netral hari ini.</strong></span><br>
+Coba tanyakan pada diri sendiri apa yang sebenarnya kamu rasakan, dan eksplorasi emosi lebih dalam lewat journaling atau refleksi.
+"""
+    elif label == "NEGATIF":
+        return """
+<span style='color:red; font-size:16px;'>😟 <strong>Kamu terlihat sedang kurang baik-baik saja.</strong></span><br>
+Luangkan waktu untuk istirahat atau melakukan hal-hal yang menenangkan. Jangan ragu untuk bercerita ke orang terpercaya.
+"""
+    else:
+        return ""
 
 # ========== 3. Init ==========
 init_db()
@@ -139,6 +159,12 @@ elif st.session_state.page == "hasil":
         st.write(f'📌 Sentimen: **{st.session_state.hasil_label}**')
         st.write(f'📈 Kepercayaan: **{st.session_state.hasil_conf}%**')
 
+        rekom = rekomendasi_sentimen(st.session_state.hasil_label)
+        if rekom:
+            st.markdown("---")
+            st.markdown("💡 <h4>Rekomendasi untuk Anda:</h4>", unsafe_allow_html=True)
+            st.markdown(rekom, unsafe_allow_html=True)
+
     st.subheader("🕒 Riwayat Status Anda")
     if st.button("🗑 Hapus Semua Riwayat"):
         hapus_semua_riwayat(st.session_state.username)
@@ -147,7 +173,7 @@ elif st.session_state.page == "hasil":
 
     df = ambil_riwayat(st.session_state.username)
     if not df.empty:
-        df['tanggal_status'] = pd.to_datetime(df['tanggal_status']).dt.strftime('%d-%m-%Y')
+        df['tanggal_status'] = pd.to_datetime(df['tanggal_status'])
         df_tampil = df.rename(columns={
             'tanggal_status': 'Tanggal',
             'isi_status': 'Status',
@@ -155,5 +181,24 @@ elif st.session_state.page == "hasil":
             'kepercayaan': 'Kepercayaan (%)'
         })[['Tanggal', 'Status', 'Label Sentimen', 'Kepercayaan (%)']]
         st.dataframe(df_tampil, use_container_width=True, hide_index=True)
-    else:
-        st.info("Belum ada riwayat tersedia.")
+
+        # ========== Tren Sentimen Mingguan ==========
+        st.markdown("---")
+        st.subheader("📈 Tren Sentimen Mingguan")
+
+        tanggal_mulai = datetime.today().date() - pd.Timedelta(days=6)
+        df_mingguan = df[df['tanggal_status'].dt.date >= tanggal_mulai]
+
+        if not df_mingguan.empty:
+            chart_data = (
+                df_mingguan
+                .groupby([df_mingguan['tanggal_status'].dt.strftime('%a'), 'label_sentimen'])
+                .size()
+                .reset_index(name='jumlah')
+            )
+
+            hari_urut = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+            chart_data['tanggal_status'] = pd.Categorical(chart_data['tanggal_status'], categories=hari_urut, ordered=True)
+
+            line_chart = alt.Chart(chart_data).mark_line(point=True).encode(
+                x=alt.X('tanggal_status:N', title='Hari')
