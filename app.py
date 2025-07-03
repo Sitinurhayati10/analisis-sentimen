@@ -1,6 +1,3 @@
-import os
-st.write("📂 File di folder:", os.listdir())
-
 import streamlit as st
 import sqlite3
 import requests
