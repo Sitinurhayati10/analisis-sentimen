@@ -207,7 +207,7 @@ if st.session_state.page == "login":
         if st.button("Masuk"):
             if not username or not password:
                 st.warning("⚠️ Username dan password tidak boleh kosong.")
-            else:
+        else:
             nama_lengkap = validasi_login(username, password)
             if nama_lengkap:
                 st.session_state.username = username
