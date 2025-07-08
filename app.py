@@ -13,14 +13,14 @@ import hashlib
 st.set_page_config("Mental Health Sentiment App", page_icon="💬", layout="centered")
 
 # -----------------------------
-# 1. Load model, TF-IDF, encoder
+# Load model, TF-IDF, encoder
 # -----------------------------
 model = joblib.load("logistic_regression_model.pkl")
 tfidf = joblib.load("tfidf_vectorizer (1).pkl")
 label_encoder = joblib.load("label_encoder.pkl")
 
 # -----------------------------
-# 2. Fungsi bantu
+# Fungsi bantu
 # -----------------------------
 def tampilkan_logo():
     col1, col2, col3 = st.columns([1, 6, 1])
@@ -36,12 +36,7 @@ def tampilkan_motivasi():
         "🌈 Setelah hujan, selalu ada pelangi."
     ]
     motivasi = random.choice(motivasi_list)
-    st.markdown(f"""
-    <div class="sentiment-box">
-        <strong>Motivasi Hari Ini:</strong><br>
-        {motivasi}
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div class="sentiment-box"><strong>Motivasi Hari Ini:</strong><br>{motivasi}</div>""", unsafe_allow_html=True)
 
 def tampilkan_motivasi_harian():
     today = datetime.today().date()
@@ -63,11 +58,8 @@ def check_autologout(timeout=900):
 def logout():
     for key in list(st.session_state.keys()):
         del st.session_state[key]
-    st.session_state.page = "login"  # Tetapkan ulang halaman login
-    st.session_state.username = None  # Optional: pastikan user kosong
-    st.rerun()  # Rerun agar halaman direfresh
-
-
+    st.session_state.page = "login"
+    st.rerun()
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -75,31 +67,22 @@ def hash_password(password):
 def init_db():
     conn = sqlite3.connect('sentimen.db')
     c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            nama_lengkap TEXT,
-            password TEXT
-        )
-    ''')
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS status (
-            id_status INTEGER PRIMARY KEY AUTOINCREMENT,
-            isi_status TEXT,
-            label_sentimen TEXT,
-            kepercayaan REAL,
-            tanggal_status DATE,
-            id_user TEXT
-        )
-    ''')
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS journal (
-            id_journal INTEGER PRIMARY KEY AUTOINCREMENT,
-            isi TEXT,
-            tanggal DATE,
-            id_user TEXT
-        )
-    ''')
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+        username TEXT PRIMARY KEY,
+        nama_lengkap TEXT,
+        password TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS status (
+        id_status INTEGER PRIMARY KEY AUTOINCREMENT,
+        isi_status TEXT,
+        label_sentimen TEXT,
+        kepercayaan REAL,
+        tanggal_status DATE,
+        id_user TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS journal (
+        id_journal INTEGER PRIMARY KEY AUTOINCREMENT,
+        isi TEXT,
+        tanggal DATE,
+        id_user TEXT)''')
     conn.commit()
     conn.close()
 
@@ -175,7 +158,7 @@ def prediksi_sentimen(teks):
     return label.upper(), round(prob, 2)
 
 # -----------------------------
-# 3. Inisialisasi
+# Inisialisasi session
 # -----------------------------
 init_db()
 if "page" not in st.session_state:
@@ -197,7 +180,7 @@ with st.sidebar:
             logout()
 
 # -----------------------------
-# 4. Login / Register Page
+# Halaman Login & Daftar
 # -----------------------------
 if st.session_state.page == "login":
     tampilkan_logo()
@@ -211,23 +194,18 @@ if st.session_state.page == "login":
         if st.button("Masuk"):
             if not username or not password:
                 st.warning("⚠️ Username dan password tidak boleh kosong.")
-        else:
-            hasil_login = validasi_login(username, password)
-
-            if hasil_login == "TIDAK_TERDAFTAR":
-                st.warning("⚠️ Akun belum terdaftar. Silakan daftar dulu.")
-            elif hasil_login == "PASSWORD_SALAH":
-                st.error("❌ Username atau password salah.")
             else:
-                # login berhasil
-                st.session_state.username = username
-                st.session_state.nama = hasil_login
-                st.session_state.last_active = time.time()
-                st.session_state.last_motivation_date = None
-                st.session_state.page = "home"
-                st.success("✅ Login berhasil.")
-                st.rerun()
-
+                hasil_login = validasi_login(username, password)
+                if hasil_login:
+                    st.session_state.username = username
+                    st.session_state.nama = hasil_login
+                    st.session_state.last_active = time.time()
+                    st.session_state.last_motivation_date = None
+                    st.session_state.page = "home"
+                    st.success("✅ Login berhasil.")
+                    st.rerun()
+                else:
+                    st.error("❌ Username atau password salah.")
 
     with tab2:
         nama_lengkap = st.text_input("Nama Lengkap", key="reg_nama")
@@ -241,11 +219,11 @@ if st.session_state.page == "login":
                 st.warning("Semua kolom wajib diisi.")
 
 # -----------------------------
-# 5. Home Page
+# Home Page
 # -----------------------------
 elif st.session_state.page == "home":
     if "username" not in st.session_state:
-        st.session_state.update(page="login")
+        st.session_state.page = "login"
         st.rerun()
     check_autologout()
     tampilkan_logo()
@@ -254,11 +232,11 @@ elif st.session_state.page == "home":
     st.write("Silakan pilih menu di sidebar.")
 
 # -----------------------------
-# 6. Input Status Page
+# Input Status Page
 # -----------------------------
 elif st.session_state.page == "input":
     if "username" not in st.session_state:
-        st.session_state.update(page="login")
+        st.session_state.page = "login"
         st.rerun()
     check_autologout()
     tampilkan_logo()
@@ -280,11 +258,11 @@ elif st.session_state.page == "input":
             st.warning("Status tidak boleh kosong.")
 
 # -----------------------------
-# 7. Hasil dan Riwayat Page
+# Hasil dan Riwayat Page
 # -----------------------------
 elif st.session_state.page == "hasil":
     if "username" not in st.session_state:
-        st.session_state.update(page="login")
+        st.session_state.page = "login"
         st.rerun()
     check_autologout()
     tampilkan_logo()
@@ -331,11 +309,11 @@ elif st.session_state.page == "hasil":
         st.rerun()
 
 # -----------------------------
-# 8. Journaling Page
+# Journaling Page
 # -----------------------------
 elif st.session_state.page == "journal":
     if "username" not in st.session_state:
-        st.session_state.update(page="login")
+        st.session_state.page = "login"
         st.rerun()
     check_autologout()
     tampilkan_logo()
