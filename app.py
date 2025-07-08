@@ -53,8 +53,9 @@ def check_autologout(timeout=900):
     now = time.time()
     last_active = st.session_state.get("last_active", now)
     if now - last_active > timeout:
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
         st.session_state.page = "login"
-        st.warning("⏳ Kamu telah logout otomatis karena tidak aktif.")
         st.rerun()
     else:
         st.session_state.last_active = now
@@ -62,8 +63,8 @@ def check_autologout(timeout=900):
 def logout():
     for key in list(st.session_state.keys()):
         del st.session_state[key]
-    st.session_state.page = "login"  # kembali ke halaman login
-    st.rerun()  # rerun agar halaman di-reset
+    st.session_state.page = "login"
+    st.rerun()
 
 
 def hash_password(password):
