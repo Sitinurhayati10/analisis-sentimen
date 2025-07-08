@@ -62,8 +62,9 @@ def check_autologout(timeout=900):
 def logout():
     for key in list(st.session_state.keys()):
         del st.session_state[key]
-    st.success("🔒 Kamu berhasil logout.")
-    st.stop()
+    st.session_state.page = "login"  # kembali ke halaman login
+    st.rerun()  # rerun agar halaman di-reset
+
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
