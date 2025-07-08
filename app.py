@@ -100,9 +100,13 @@ def validasi_login(username, password):
     c.execute("SELECT nama_lengkap, password FROM users WHERE username = ?", (username,))
     row = c.fetchone()
     conn.close()
-    if row and row[1] == hash_password(password):
+    if not row:
+        return "TIDAK_TERDAFTAR"
+    elif row[1] != hash_password(password):
+        return "PASSWORD_SALAH"
+    else:
         return row[0]  # nama_lengkap
-    return None
+
 
 def simpan_status(id_user, isi_status, label_sentimen, confidence):
     conn = sqlite3.connect('sentimen.db')
@@ -195,19 +199,23 @@ if st.session_state.page == "login":
         password = st.text_input("Password", type="password")
         if st.button("Masuk"):
             if not username or not password:
-                st.warning("⚠️ Username dan password tidak boleh kosong.")
-            else:
-                hasil_login = validasi_login(username, password)
-                if hasil_login:
-                    st.session_state.username = username
-                    st.session_state.nama = hasil_login
-                    st.session_state.last_active = time.time()
-                    st.session_state.last_motivation_date = None
-                    st.session_state.page = "home"
-                    st.success("✅ Login berhasil.")
-                    st.rerun()
-                else:
-                    st.error("❌ Username atau password salah.")
+            st.warning("⚠️ Username dan password tidak boleh kosong.")
+        else:
+        hasil_login = validasi_login(username, password)
+        
+        if hasil_login == "TIDAK_TERDAFTAR":
+            st.warning("⚠️ Username belum terdaftar. Silakan daftar terlebih dahulu.")
+        elif hasil_login == "PASSWORD_SALAH":
+            st.error("❌ Password salah. Coba lagi.")
+        else:
+            st.session_state.username = username
+            st.session_state.nama = hasil_login
+            st.session_state.last_active = time.time()
+            st.session_state.last_motivation_date = None
+            st.session_state.page = "home"
+            st.success("✅ Login berhasil.")
+            st.rerun()
+
 
     with tab2:
         nama_lengkap = st.text_input("Nama Lengkap", key="reg_nama")
