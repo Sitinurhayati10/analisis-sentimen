@@ -55,7 +55,7 @@ def check_autologout(timeout=900):
     if now - last_active > timeout:
         st.session_state.page = "login"
         st.warning("⏳ Kamu telah logout otomatis karena tidak aktif.")
-        st.stop()
+        st.rerun()
     else:
         st.session_state.last_active = now
 
