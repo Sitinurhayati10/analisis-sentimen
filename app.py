@@ -184,7 +184,6 @@ if st.session_state.page != "login":
             if st.button("🚪 Logout"):
                 logout()
 
-
 # -----------------------------
 # Halaman Login & Daftar
 # -----------------------------
@@ -295,7 +294,19 @@ elif st.session_state.page == "hasil":
         st.subheader("📈 Tren Harian")
         df['tanggal_status'] = pd.to_datetime(df['tanggal_status'])
         df_harian = df.groupby(['tanggal_status', 'label_sentimen']).size().reset_index(name='jumlah')
-        fig = px.bar(df_harian, x='tanggal_status', y='jumlah', color='label_sentimen', barmode='group')
+        fig = px.bar(
+    df_harian,
+    x='tanggal_status',
+    y='jumlah',
+    color='label_sentimen',
+    color_discrete_map={
+        'POSITIF': 'blue',
+        'NETRAL': 'gray',
+        'NEGATIF': 'red'
+    },
+    category_orders={"label_sentimen": ["POSITIF", "NETRAL", "NEGATIF"]},
+    barmode='group'
+)
         st.plotly_chart(fig, use_container_width=True)
 
         st.subheader("🧾 Riwayat")
