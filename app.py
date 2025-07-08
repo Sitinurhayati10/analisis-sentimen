@@ -167,17 +167,19 @@ if "page" not in st.session_state:
 # -----------------------------
 # Sidebar Navigasi
 # -----------------------------
-with st.sidebar:
-    tampilkan_logo()
-    st.title("🧭 Navigasi")
-    st.button("🏠 Beranda", on_click=lambda: st.session_state.update(page="home"))
-    st.button("✍️ Input Status", on_click=lambda: st.session_state.update(page="input"))
-    st.button("📊 Riwayat", on_click=lambda: st.session_state.update(page="hasil"))
-    st.button("📖 Journal", on_click=lambda: st.session_state.update(page="journal"))
-    if "username" in st.session_state:
+if st.session_state.page != "login":
+    with st.sidebar:
+        tampilkan_logo()
+        st.title("🧭 Navigasi")
+        st.button("🏠 Beranda", on_click=lambda: st.session_state.update(page="home"))
+        st.button("✍️ Input Status", on_click=lambda: st.session_state.update(page="input"))
+        st.button("📊 Riwayat", on_click=lambda: st.session_state.update(page="hasil"))
+        st.button("📖 Journal", on_click=lambda: st.session_state.update(page="journal"))
         st.markdown("---")
-        if st.button("🚪 Logout"):
-            logout()
+        if "username" in st.session_state:
+            if st.button("🚪 Logout"):
+                logout()
+
 
 # -----------------------------
 # Halaman Login & Daftar
