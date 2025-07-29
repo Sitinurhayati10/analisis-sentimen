@@ -19,7 +19,7 @@ def load_nlp_resources():
     try:
         # Perhatikan: Disarankan untuk mengganti nama file "tfidf_vectorizer (1).pkl"
         # menjadi "tfidf_vectorizer.pkl" untuk konsistensi.
-        model = joblib.load("sentiment_model.pkl")
+        model = joblib.load("logistic_regression.pkl")
         tfidf = joblib.load("tfidf_vectorizer (1).pkl") # Pastikan nama file sudah diperbaiki
         label_encoder = joblib.load("label_encoder.pkl")
         return model, tfidf, label_encoder
