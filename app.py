@@ -19,8 +19,8 @@ def load_nlp_resources():
     try:
         # Perhatikan: Disarankan untuk mengganti nama file "tfidf_vectorizer (1).pkl"
         # menjadi "tfidf_vectorizer.pkl" untuk konsistensi.
-        model = joblib.load("logistic_regression_model.pkl")
-        tfidf = joblib.load("tfidf_vectorizer (1).pkl") # Pastikan nama file sudah diperbaiki
+        model = joblib.load("naivebayes_model.pkl")
+        tfidf = joblib.load("tf-idf_vectorizer.pkl") # Pastikan nama file sudah diperbaiki
         label_encoder = joblib.load("label_encoder.pkl")
         return model, tfidf, label_encoder
     except FileNotFoundError as e:
@@ -653,3 +653,4 @@ def show_footer():
 if __name__ == "__main__":
     main()
     show_footer()
+
